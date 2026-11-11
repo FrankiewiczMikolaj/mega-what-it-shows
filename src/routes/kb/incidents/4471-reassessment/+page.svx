@@ -1,0 +1,85 @@
+---
+layout: runbook
+title: '#4471 reassessed: parser and booking-form hint'
+owner: Pi harness (lane 07)
+status: draft
+reviewed: 2026-11-11
+signature: 'v1.eyJzdWIiOiIxOTkwIiwiYXVkIjoiY2hhbGxlbmdlOndoYXQtaXQtc2hvd3MiLCJpYXQiOjE3OTQzOTkyNjAsImV4cCI6MTc5NDQ4NTY2MH0.sStzwaK_dD73_JaMhwi9FM6fbL66_3_m0vpQZnCKRSg'
+---
+
+<script>
+  import CauseTable from '#lib/kb/CauseTable.svelte';
+  import Callout from '#lib/kb/Callout.svelte';
+  import RenderStamp from '#lib/kb/RenderStamp.svelte';
+</script>
+
+The [original incident page](/kb/incidents/4471) says one issue and one queued fix.
+The exported implementation distinguishes a shared-parser fault from a booking-form
+hint mismatch. Similar subjects and similar date swaps do not make them the same fault.
+
+<Callout>
+The kb export dated 2026-10-04 was downloaded again from the Challenge page on
+2026-11-11. It is byte-identical to the previous export; the grouping rerun is also
+byte-identical. This page describes that snapshot, not a verified live support queue.
+Neither a fix nor course acceptance is claimed.
+</Callout>
+
+## What the exported data shows
+
+Counts below are computed by the kb component from its report data. It deduplicates by
+report ID before selecting reports merged into ticket 4471. Repeated export rows are
+not additional people or additional reports.
+
+<CauseTable ticket={4471} />
+
+The table's ticket-ownership labels describe the original support export, not GitHub
+issues. The two problems are tracked separately in [the shared-parser issue](https://github.com/FrankiewiczMikolaj/mega-what-it-shows/issues/2)
+and [the booking-v3 hint issue](https://github.com/FrankiewiczMikolaj/mega-what-it-shows/issues/3).
+
+## Shared parser
+
+The shared parser reads month-first while these tenants write dates day-first.
+For example, R-41200 from harbour.dental reports a reminder for 7 April arriving for
+4 July. The tenant directory identifies its locale as en-GB.
+
+The exported classifier assigns day-first tenant reports here except form-channel
+reports using booking-v3. Use the tenant's stored locale, not the reporter's browser
+locale or intake tag. Fix and test parsing separately from the displayed form hint.
+
+## Booking-v3 date hint
+
+Booking-v3 displays `MM/DD/YYYY`, but its form reads the date using the tenant's
+convention. For day-first tenants, following that hint can swap the intended date.
+R-41230 from copper.studio reports 1 June instead of 6 January; the tenant uses
+es-ES and booking-v3, and the report channel is form.
+
+This group is limited to form-channel reports for day-first booking-v3 tenants.
+Their app and email reports stay in the parser group. Align the hint with the
+accepted input and test both together; a parser fix alone does not demonstrate this
+mismatch is resolved.
+
+## Keep uncertain reports visible
+
+The desk notes flag R-41202, R-41209, R-41236, R-41344 and R-41620 as unusual timing or
+one-day moves. The exported classifier assigns them to parser, but their wording does
+not independently establish that cause. Keep their IDs counted exactly once and
+investigate them; do not turn a possible timezone explanation into a confirmed bug.
+
+## Triage and follow-up
+
+The [written triage rule](/kb/triage/dedupe) and
+[accepted decision 0001](/kb/decisions/0001-dedupe-by-subject) merge on normalized
+subject alone. The interactive example instead compares causes. This disagreement
+explains why the written policy is not enough to establish that every merged report
+shares a fix.
+
+Proposed practice: compare the report body and the tenant's locale, form and channel
+before merging. Matching subjects are a search aid, not proof of a shared cause.
+This is a recommendation, not an approved policy change. Leave accepted decision
+0001 unchanged; any replacement needs a new decision record.
+
+The grouping evidence retains source hashes and per-report assignments for audit.
+The new download did not establish whether the desk has received additional reports
+outside this export. The counts above apply only to the supplied snapshot.
+
+<RenderStamp {signature} />

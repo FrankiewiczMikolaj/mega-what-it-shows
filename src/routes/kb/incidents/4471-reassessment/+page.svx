@@ -1,8 +1,8 @@
 ---
 layout: runbook
-title: '#4471 reassessed: parser and booking-form hint'
+title: '#4471 reassessed: parser, booking-form hint and one-day shifts'
 owner: Pi harness (lane 07)
-status: draft
+status: accepted
 reviewed: 2026-11-11
 signature: 'v1.eyJzdWIiOiIxOTkwIiwiYXVkIjoiY2hhbGxlbmdlOndoYXQtaXQtc2hvd3MiLCJpYXQiOjE3OTQzOTkyNjAsImV4cCI6MTc5NDQ4NTY2MH0.sStzwaK_dD73_JaMhwi9FM6fbL66_3_m0vpQZnCKRSg'
 ---
@@ -11,16 +11,27 @@ signature: 'v1.eyJzdWIiOiIxOTkwIiwiYXVkIjoiY2hhbGxlbmdlOndoYXQtaXQtc2hvd3MiLCJpY
   import CauseTable from '#lib/kb/CauseTable.svelte';
   import Callout from '#lib/kb/Callout.svelte';
   import RenderStamp from '#lib/kb/RenderStamp.svelte';
+  import reports from '#lib/data/reports-4471.json';
+  import notes from '#lib/data/desk-notes.json';
+  import { causeOf, uniqueById } from '#lib/kb/causes';
+  import { tenantOf } from '#lib/kb/locales';
+
+  const merged = uniqueById(reports).filter((r) => r.mergedInto === 4471);
+  const oneDayMoves = merged.filter((r) => notes.oneDayMove.includes(r.id));
+  const remaining = merged.filter((r) => !notes.oneDayMove.includes(r.id));
+  const parserCount = remaining.filter((r) => causeOf(r, tenantOf(r)) === 'parser').length;
+  const hintCount = remaining.filter((r) => causeOf(r, tenantOf(r)) === 'hint').length;
 </script>
 
 The [original incident page](/kb/incidents/4471) says one issue and one queued fix.
-The exported implementation distinguishes a shared-parser fault from a booking-form
-hint mismatch. Similar subjects and similar date swaps do not make them the same fault.
+The reassessment separates three problems: shared-parser day/month swaps, a booking-v3
+date-hint mismatch, and one-day/timing shifts. Similar subjects do not prove a shared cause.
 
 <Callout>
 The kb export dated 2026-10-04 was downloaded again from the Challenge page on
-2026-11-11. It is byte-identical to the previous export; the grouping rerun is also
-byte-identical. This page describes that snapshot, not a verified live support queue.
+2026-11-11. It is byte-identical to the previous export. The corrected split separates
+the desk's one-day moves before applying the tenant/channel/form classifier.
+This page describes that snapshot, not a verified live support queue.
 Neither a fix nor course acceptance is claimed.
 </Callout>
 
@@ -32,9 +43,24 @@ not additional people or additional reports.
 
 <CauseTable ticket={4471} />
 
-The table's ticket-ownership labels describe the original support export, not GitHub
-issues. The two problems are tracked separately in [the shared-parser issue](https://github.com/FrankiewiczMikolaj/mega-what-it-shows/issues/2)
-and [the booking-v3 hint issue](https://github.com/FrankiewiczMikolaj/mega-what-it-shows/issues/3).
+CauseTable shows how the export files reports, not the corrected issue split. Its
+parser row includes the {oneDayMoves.length} desk-noted one-day/timing moves because
+its classifier uses tenant, channel and form without inspecting the report body.
+Those moves have their own ticket; they are not day/month swaps. The table's ownership
+labels describe the original support export, not the current GitHub issues.
+
+## Corrected split
+
+These counts are computed from the same deduplicated export. First separate the IDs
+in desk-notes.json oneDayMove; classify the remaining reports using the kb's own logic.
+Each report belongs to exactly one of these tickets.
+
+| Problem | Reports | Tracking |
+| --- | --- | --- |
+| Shared parser | {parserCount} | [Issue #2](https://github.com/FrankiewiczMikolaj/mega-what-it-shows/issues/2) |
+| Booking-v3 date hint | {hintCount} | [Issue #3](https://github.com/FrankiewiczMikolaj/mega-what-it-shows/issues/3) |
+| One-day/timing shifts (timezone investigation) | {oneDayMoves.length} | [Issue #4](https://github.com/FrankiewiczMikolaj/mega-what-it-shows/issues/4) |
+| Total | {merged.length} | No overlaps or omissions |
 
 ## Shared parser
 
@@ -42,8 +68,8 @@ The shared parser reads month-first while these tenants write dates day-first.
 For example, R-41200 from harbour.dental reports a reminder for 7 April arriving for
 4 July. The tenant directory identifies its locale as en-GB.
 
-The exported classifier assigns day-first tenant reports here except form-channel
-reports using booking-v3. Use the tenant's stored locale, not the reporter's browser
+After excluding the desk-noted one-day moves, assign day-first tenant reports here
+except form-channel reports using booking-v3. Use the tenant's stored locale, not the reporter's browser
 locale or intake tag. Fix and test parsing separately from the displayed form hint.
 
 ## Booking-v3 date hint
@@ -54,16 +80,25 @@ R-41230 from copper.studio reports 1 June instead of 6 January; the tenant uses
 es-ES and booking-v3, and the report channel is form.
 
 This group is limited to form-channel reports for day-first booking-v3 tenants.
-Their app and email reports stay in the parser group. Align the hint with the
+Their app and email reports stay in the parser group unless flagged as one-day moves. Align the hint with the
 accepted input and test both together; a parser fix alone does not demonstrate this
 mismatch is resolved.
 
-## Keep uncertain reports visible
+## One-day/timing shifts
 
-The desk notes flag R-41202, R-41209, R-41236, R-41344 and R-41620 as unusual timing or
-one-day moves. The exported classifier assigns them to parser, but their wording does
-not independently establish that cause. Keep their IDs counted exactly once and
-investigate them; do not turn a possible timezone explanation into a confirmed bug.
+The desk notes flag R-41202, R-41209, R-41236, R-41344 and R-41620. These reports are
+tracked separately in [issue #4](https://github.com/FrankiewiczMikolaj/mega-what-it-shows/issues/4),
+not counted again in the corrected parser group.
+
+R-41202 describes Tuesday 12 May becoming Monday 11 May. R-41344 reports:
+
+> Client in Lisbon got Tuesday. Client in Toronto got Monday. Same meeting. We held it twice.
+
+This is a different symptom from exchanging day and month. Investigate timezone
+conversion and date-boundary handling separately. R-41236 describes an invite arriving
+before the booking rather than an explicit one-day shift; its membership follows the
+desk note. The exact implementation defect is unverified, so the ticket's timezone
+label is an investigation direction, not a proven diagnosis for every report.
 
 ## Triage and follow-up
 
